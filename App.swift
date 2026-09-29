@@ -63,7 +63,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.async { self?.render() }
         }
         render(); refresh()
-        // Keep content empty until both native layout and the first usage refresh finish.
+        // Reserve the final image size, drawing nothing until layout and the first refresh finish.
         Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] startupTimer in
             guard let self else { startupTimer.invalidate(); return }
             guard !self.busy, let window = self.item.button?.window, window.frame.height > 0 else { return }
@@ -94,9 +94,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let padded = String(repeating: " ", count: max(0, 4 - label.count)) + label
             return ("\(padded) \(planLabel(a.plan))\(mark)", a.identity == active)
         }
-        if starting {
-            item.button?.image = nil; item.button?.title = ""
-        } else if rows.isEmpty {
+        if rows.isEmpty {
             item.length = NSStatusItem.variableLength
             item.button?.image = nil; item.button?.title = "Codex +"
         } else {
@@ -109,9 +107,12 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let height: CGFloat = rows.count == 3 ? floor(imageHeight / 3) : rows.count == 2 ? 10 : 16
             let size: CGFloat = rows.count == 3 ? min(9, height - 0.5) : rows.count == 2 ? 9 : 11
             let font = NSFont.monospacedSystemFont(ofSize: size, weight: .medium)
-            let width = ceil(rows.map { ($0.0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 50) + 4
+            // Measure the full percentage column, never the temporary em dash or current value.
+            let width = ceil(accounts.map { ("100% \(planLabel($0.plan)) " as NSString).size(withAttributes: [.font: font]).width }.max() ?? 50) + 4
             let dark = item.button?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let drawContent = !starting
             let image = NSImage(size: NSSize(width: width, height: imageHeight), flipped: false) { rect in
+                guard drawContent else { return true }
                 for (i, row) in rows.enumerated() {
                     let y = (imageHeight - CGFloat(rows.count) * height) / 2 + CGFloat(rows.count - i - 1) * height
                     if row.1 {

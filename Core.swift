@@ -56,10 +56,14 @@ struct Credentials {
 
 func planLabel(_ plan: String) -> String {
     switch plan {
-    case "prolite": return "Pro x5"
-    case "pro": return "Pro x20"
+    case "prolite": return "Pro $100"
+    case "pro": return "Pro $200"
     case "plus": return "Plus"
     case "free": return "Free"
+    case "go": return "Go"
+    case "team", "business", "self_serve_business_prolite", "self_serve_business_usage_based": return "Business"
+    case "enterprise", "ent26", "enterprise_cbp_automation", "enterprise_cbp_usage_based": return "Enterprise"
+    case "edu", "edu_plus", "edu_pro": return "Edu"
     case "unknown": return "Codex"
     default: return plan.capitalized
     }

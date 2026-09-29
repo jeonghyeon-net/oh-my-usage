@@ -30,7 +30,12 @@ import Foundation
         check(try Usage(response(-20), workspace: "test").label == "100%")
         var wrong = response(50); wrong["accountId"] = "different"
         do { _ = try Usage(wrong, workspace: "test"); fatalError("Account mismatch accepted") } catch {}
-        check(planLabel("prolite") == "Pro x5" && planLabel("pro") == "Pro x20")
+        let planNames = ["prolite": "Pro $100", "pro": "Pro $200", "plus": "Plus", "free": "Free", "go": "Go",
+                         "team": "Business", "business": "Business", "self_serve_business_prolite": "Business",
+                         "self_serve_business_usage_based": "Business", "enterprise": "Enterprise", "ent26": "Enterprise",
+                         "enterprise_cbp_automation": "Enterprise", "enterprise_cbp_usage_based": "Enterprise",
+                         "edu": "Edu", "edu_plus": "Edu", "edu_pro": "Edu", "unknown": "Codex", "future": "Future"]
+        for (plan, name) in planNames { check(planLabel(plan) == name) }
 
         let claims: [String: Any] = ["sub": "test-user", "email": "dummy@example.invalid", "https://api.openai.com/auth": ["chatgpt_plan_type": "prolite"]]
         let base64 = try JSONSerialization.data(withJSONObject: claims).base64EncodedString().replacingOccurrences(of: "=", with: "")

@@ -12,6 +12,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var errors: [String: String] = [:]
     private var item: NSStatusItem!
     private var timer: Timer?
+    private var appearanceObservation: NSKeyValueObservation?
     private var busy = false
     private var message: String?
     private var loginSession: CodexRPC?
@@ -55,9 +56,20 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         } catch { showError(error); NSApp.terminate(nil); return }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.alphaValue = 0
         let menu = NSMenu(); menu.delegate = self; item.menu = menu
+        appearanceObservation = item.button?.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.render() }
+        }
         render(); refresh()
-        DispatchQueue.main.async { self.render() }
+        // The first appearance is provisional; keep the button blank until the menu bar is laid out.
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] startupTimer in
+            guard let self else { startupTimer.invalidate(); return }
+            guard let button = self.item.button, let window = button.window, window.frame.height > 0 else { return }
+            self.render()
+            button.alphaValue = 1
+            startupTimer.invalidate()
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refresh() }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(woke), name: NSWorkspace.didWakeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(screenChanged), name: NSApplication.didChangeScreenParametersNotification, object: nil)

@@ -1,0 +1,42 @@
+name: 버그 제보 / Bug report
+description: 재현 가능한 문제를 알려 주세요. 인증 정보는 첨부하지 마세요.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        보안 문제는 SECURITY.md의 비공개 제보 경로를 사용하세요.
+        토큰, auth.json, 실제 이메일, 개인 홈 경로가 포함된 로그나 화면은 올리지 마세요.
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제와 기대한 동작
+      description: 실제로 일어난 일과 기대한 결과를 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 순서
+      placeholder: |
+        1. 앱 실행
+        2. 메뉴 열기
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 환경
+      description: 계정 이메일이나 인증 파일은 필요하지 않습니다.
+      placeholder: |
+        oh-my-usage 버전 또는 커밋:
+        macOS 버전 / Mac 모델:
+        Codex 앱 버전:
+        계정 수 / 화면 수 / 밝은·어두운 모드:
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 추가 정보
+      description: 개인정보를 지운 화면이나 오류 메시지를 첨부할 수 있습니다.

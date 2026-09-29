@@ -155,7 +155,8 @@ final class CodexRPC {
         timeout = deadline
         DispatchQueue.global().asyncAfter(deadline: .now() + seconds, execute: deadline)
         do {
-            _ = try request(0, "initialize", ["clientInfo": ["name": "oh_my_usage", "version": "0.1"], "capabilities": NSNull()])
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+            _ = try request(0, "initialize", ["clientInfo": ["name": "oh_my_usage", "version": version], "capabilities": NSNull()])
             try send(["method": "initialized"])
         } catch { stop(); throw error }
     }

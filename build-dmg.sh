@@ -14,4 +14,6 @@ ln -s /Applications "$STAGING/Applications"
 codesign --verify --strict "$STAGING/oh-my-usage.app"
 hdiutil create -volname "oh-my-usage" -srcfolder "$STAGING" -format UDZO -ov "$DMG"
 hdiutil verify "$DMG"
+(cd build && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
 printf '%s\n' "Packaged: $DMG"
+printf '%s\n' "Checksum: $DMG.sha256"

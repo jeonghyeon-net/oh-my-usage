@@ -1,0 +1,17 @@
+name: 기능 제안 / Feature request
+description: 계정 확인과 전환에서 느끼는 불편을 알려 주세요.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 해결하고 싶은 불편
+      description: 언제 어떤 문제가 생기는지 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 원하는 동작
+      description: 간단한 예시나 기존 기능으로 해결하기 어려운 이유를 적어 주세요.
+    validations:
+      required: true

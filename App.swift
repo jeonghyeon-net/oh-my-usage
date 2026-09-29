@@ -13,6 +13,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var item: NSStatusItem!
     private var timer: Timer?
     private var appearanceObservation: NSKeyValueObservation?
+    private var starting = true
     private var busy = false
     private var message: String?
     private var loginSession: CodexRPC?
@@ -55,19 +56,19 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         } catch { showError(error); NSApp.terminate(nil); return }
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.alphaValue = 0
+        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.button?.imageScaling = .scaleNone
         let menu = NSMenu(); menu.delegate = self; item.menu = menu
         appearanceObservation = item.button?.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
             DispatchQueue.main.async { self?.render() }
         }
         render(); refresh()
-        // The first appearance is provisional; keep the button blank until the menu bar is laid out.
+        // Keep content empty until both native layout and the first usage refresh finish.
         Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] startupTimer in
             guard let self else { startupTimer.invalidate(); return }
-            guard let button = self.item.button, let window = button.window, window.frame.height > 0 else { return }
+            guard !self.busy, let window = self.item.button?.window, window.frame.height > 0 else { return }
+            self.starting = false
             self.render()
-            button.alphaValue = 1
             startupTimer.invalidate()
         }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refresh() }
@@ -89,9 +90,13 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let active = current?.identity
         let rows = accounts.map { a -> (String, Bool) in
             let mark = errors[a.id] == nil ? "" : "!"
-            return ("\(usage[a.id]?.label ?? "—")\(mark) \(planLabel(a.plan))", a.identity == active)
+            let label = usage[a.id]?.label ?? "—"
+            let padded = String(repeating: " ", count: max(0, 4 - label.count)) + label
+            return ("\(padded) \(planLabel(a.plan))\(mark)", a.identity == active)
         }
-        if rows.isEmpty {
+        if starting {
+            item.button?.image = nil; item.button?.title = ""
+        } else if rows.isEmpty {
             item.length = NSStatusItem.variableLength
             item.button?.image = nil; item.button?.title = "Codex +"
         } else {

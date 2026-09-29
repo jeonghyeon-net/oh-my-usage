@@ -1,4 +1,4 @@
-# oh-my-usage
+# Oh My Usage
 
 **Codex 계정 여러 개, 메뉴바 하나.** 주간 잔여량을 확인하고 클릭으로 계정을 바꾸는 작은 macOS 앱입니다.
 
@@ -7,6 +7,12 @@
 <sub>가상 사용량으로 만든 소개 이미지입니다. 실제 앱은 macOS 메뉴바와 기본 메뉴로 동작합니다.</sub>
 
 [DMG 다운로드](https://github.com/jeonghyeon-net/oh-my-usage/releases/latest) · [사용법](docs/user-guide.md) · [기여하기](CONTRIBUTING.md) · [변경 기록](CHANGELOG.md)
+
+## 실제 화면
+
+![macOS 메뉴바에 표시된 세 계정의 주간 잔여량과 계정 전환 메뉴](docs/assets/screenshot.png)
+
+<sub>macOS에서 캡처한 앱 화면입니다. 계정과 사용량은 예시 데이터입니다.</sub>
 
 ## 하는 일
 

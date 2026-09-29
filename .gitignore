@@ -1,0 +1,13 @@
+build/
+*.app/
+*.dmg
+.DS_Store
+
+# Local account data and secrets
+.codex/
+.env
+.env.*
+auth*.json
+accounts.json
+switch-backup.json
+*.log

@@ -1,6 +1,41 @@
 import AppKit
+import CoreText
 import ServiceManagement
 
+// Kept outside the application delegate so offline tests exercise the actual drawing callback.
+func statusImage(rows: [(String, Bool)], width: CGFloat, imageHeight: CGFloat,
+                 height: CGFloat, size: CGFloat, font: NSFont, dark: Bool, drawContent: Bool) -> NSImage {
+    let image = NSImage(size: NSSize(width: width, height: imageHeight), flipped: false) { _ in
+        guard drawContent else { return true }
+        guard let context = NSGraphicsContext.current?.cgContext else { return false }
+        for (i, row) in rows.enumerated() {
+            let y = (imageHeight - CGFloat(rows.count) * height) / 2 + CGFloat(rows.count - i - 1) * height
+            if row.1 {
+                NSColor(calibratedRed: 1, green: 0.85, blue: 0.2, alpha: 1).setFill()
+                NSBezierPath(roundedRect: NSRect(x: 1, y: y, width: width - 2, height: height), xRadius: 2, yRadius: 2).fill()
+            }
+            let color: NSColor = row.1 ? .black : (dark ? .white : .black)
+            let rowFont = row.1 ? NSFont.monospacedSystemFont(ofSize: size, weight: .bold) : font
+            // NSString drawing can raise an uncaught CoreText exception when adapting
+            // a system monospace font and NSColor on macOS 27. Supply CoreText types directly.
+            let attributes: [NSAttributedString.Key: Any] = [
+                NSAttributedString.Key(kCTFontAttributeName as String): rowFont as CTFont,
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): color.cgColor
+            ]
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: row.0, attributes: attributes))
+            context.saveGState()
+            context.textMatrix = .identity
+            context.textPosition = CGPoint(x: 2, y: y - rowFont.descender)
+            CTLineDraw(line, context)
+            context.restoreGState()
+        }
+        return true
+    }
+    image.isTemplate = false
+    return image
+}
+
+#if !RENDER_TESTS
 @main
 final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let fm = FileManager.default
@@ -111,21 +146,9 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let width = ceil(accounts.map { ("100% \(planLabel($0.plan)) " as NSString).size(withAttributes: [.font: font]).width }.max() ?? 50) + 4
             let dark = item.button?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let drawContent = !starting
-            let image = NSImage(size: NSSize(width: width, height: imageHeight), flipped: false) { rect in
-                guard drawContent else { return true }
-                for (i, row) in rows.enumerated() {
-                    let y = (imageHeight - CGFloat(rows.count) * height) / 2 + CGFloat(rows.count - i - 1) * height
-                    if row.1 {
-                        NSColor(calibratedRed: 1, green: 0.85, blue: 0.2, alpha: 1).setFill()
-                        NSBezierPath(roundedRect: NSRect(x: 1, y: y, width: width - 2, height: height), xRadius: 2, yRadius: 2).fill()
-                    }
-                    let color: NSColor = row.1 ? .black : (dark ? .white : .black)
-                    let rowFont = row.1 ? NSFont.monospacedSystemFont(ofSize: size, weight: .bold) : font
-                    (row.0 as NSString).draw(at: NSPoint(x: 2, y: y), withAttributes: [.font: rowFont, .foregroundColor: color])
-                }
-                return true
-            }
-            image.isTemplate = false; item.button?.image = image
+            let image = statusImage(rows: rows, width: width, imageHeight: imageHeight,
+                                    height: height, size: size, font: font, dark: dark, drawContent: drawContent)
+            item.button?.image = image
             item.length = width + 2
         }
         item.button?.toolTip = "Codex 주간 잔여량 · 클릭하여 계정 전환"
@@ -345,3 +368,5 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 }
+
+#endif

@@ -11,7 +11,7 @@
 외부 패키지나 Xcode 프로젝트 생성은 필요하지 않습니다. 테스트와 빌드는 로그인 없이 실행할 수 있습니다.
 
 ```sh
-make test     # 가짜 데이터로 Core.swift 테스트
+make test     # 가짜 데이터로 코어·메뉴바 렌더링 테스트
 make build    # build/oh-my-usage.app
 make check    # 테스트, 빌드, plist/셸/공백 검사
 make package  # 테스트, DMG, SHA-256 체크섬

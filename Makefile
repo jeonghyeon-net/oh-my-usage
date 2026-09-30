@@ -11,6 +11,8 @@ test:
 	@mkdir -p build
 	xcrun swiftc -swift-version 5 Core.swift Tests.swift -o build/core-tests
 	build/core-tests
+	xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 -D RENDER_TESTS Core.swift App.swift RenderTests.swift -o build/render-tests -framework AppKit -framework ServiceManagement
+	build/render-tests
 
 check: test build
 	sh -n build.sh

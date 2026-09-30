@@ -10,6 +10,14 @@ import Foundation
         let weekly = try Usage(response(96), workspace: "test")
         check(weekly.label == "4%")
         check(weekly.reset?.timeIntervalSince1970 == 1_800_000_000)
+        check(weekly.resetLabel(timeZone: TimeZone(secondsFromGMT: 0)!) == "초기화 1/15 (금) 08:00")
+        check(weekly.resetLabel(timeZone: TimeZone(identifier: "Asia/Seoul")!) == "초기화 1/15 (금) 17:00")
+        check(weekly.resetLabel(timeZone: TimeZone(secondsFromGMT: -9 * 3600)!) == "초기화 1/14 (목) 23:00")
+        for invalid: Any in [0, -1, true, "1800000000", NSNull(), Double.infinity] {
+            let missing: [String: Any] = ["rateLimits": ["primary": ["windowDurationMins": 10080, "resetsAt": invalid]]]
+            check(try Usage(missing, workspace: "test").resetLabel() == "초기화 —")
+        }
+        check(try Usage(response(10, minutes: 300), workspace: "test").resetLabel() == "초기화 —")
         check(weekly.resetCreditCount == nil && weekly.resetCreditLabel == "—")
         var credits = response(96)
         credits["rateLimitResetCredits"] = ["availableCount": 3, "credits": []] as [String: Any]

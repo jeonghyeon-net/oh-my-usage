@@ -2,32 +2,112 @@ import AppKit
 import CoreText
 import ServiceManagement
 
+struct StatusRow {
+    let remaining: String
+    let plan: String
+    let active: Bool
+    var hasError = false
+
+    var label: String { "\(remaining) \(plan)\(hasError ? "!" : "")" }
+}
+
+private func textWidth(_ text: String, font: NSFont) -> CGFloat {
+    let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [
+        NSAttributedString.Key(kCTFontAttributeName as String): font as CTFont
+    ]))
+    return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+}
+
+struct StatusLayout {
+    let percentageRight: CGFloat
+    let planLeft: CGFloat
+    let errorLeft: CGFloat
+    let width: CGFloat
+
+    init(rows: [StatusRow], size: CGFloat) {
+        // Reserve both font weights and the error marker, including while loading.
+        let fonts = [NSFont.monospacedSystemFont(ofSize: size, weight: .medium),
+                     NSFont.monospacedSystemFont(ofSize: size, weight: .bold)]
+        let percentageWidth = fonts.flatMap { font in ["100%", "<1%", "—"].map { textWidth($0, font: font) } }.max() ?? 0
+        percentageRight = 4 + ceil(percentageWidth)
+        planLeft = percentageRight + 5
+        let planWidth = fonts.flatMap { font in rows.map { textWidth($0.plan, font: font) } }.max() ?? 0
+        errorLeft = planLeft + ceil(planWidth) + 2
+        width = errorLeft + ceil(fonts.map { textWidth("!", font: $0) }.max() ?? 0) + 4
+    }
+}
+
+struct AccountMenuRow {
+    let remaining: String
+    let plan: String
+    let email: String
+    let reset: String
+    let credits: String
+
+    var columns: [String] { [remaining, plan, email, reset, "↻ " + credits] }
+    var title: String { columns.joined(separator: "  ·  ") }
+}
+
+struct AccountMenuLayout {
+    private let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    private let paragraph: NSParagraphStyle
+
+    init(rows: [AccountMenuRow]) {
+        let font = self.font
+        let style = NSMutableParagraphStyle()
+        var offset: CGFloat = 1
+        var stops: [NSTextTab] = []
+        for column in 0..<5 {
+            let width = ceil(rows.map { textWidth($0.columns[column], font: font) }.max() ?? 0)
+            let numeric = column == 0 || column == 4
+            stops.append(NSTextTab(textAlignment: numeric ? .right : .left,
+                                  location: numeric ? offset + width : offset))
+            offset += width + 18
+        }
+        style.tabStops = stops
+        style.defaultTabInterval = 0
+        style.firstLineHeadIndent = 0.5
+        style.headIndent = 0.5
+        paragraph = style
+    }
+
+    func title(for row: AccountMenuRow, active: Bool) -> NSAttributedString {
+        var attributes: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
+        if active { attributes[.foregroundColor] = NSColor.systemBlue }
+        return NSAttributedString(string: "\t" + row.columns.joined(separator: "\t"), attributes: attributes)
+    }
+}
+
 // Kept outside the application delegate so offline tests exercise the actual drawing callback.
-func statusImage(rows: [(String, Bool)], width: CGFloat, imageHeight: CGFloat,
+func statusImage(rows: [StatusRow], width: CGFloat, imageHeight: CGFloat,
                  height: CGFloat, size: CGFloat, font: NSFont, dark: Bool, drawContent: Bool) -> NSImage {
+    let layout = StatusLayout(rows: rows, size: size)
     let image = NSImage(size: NSSize(width: width, height: imageHeight), flipped: false) { _ in
         guard drawContent else { return true }
         guard let context = NSGraphicsContext.current?.cgContext else { return false }
         for (i, row) in rows.enumerated() {
             let y = (imageHeight - CGFloat(rows.count) * height) / 2 + CGFloat(rows.count - i - 1) * height
-            if row.1 {
+            if row.active {
                 NSColor(calibratedRed: 1, green: 0.85, blue: 0.2, alpha: 1).setFill()
-                NSBezierPath(roundedRect: NSRect(x: 1, y: y, width: width - 2, height: height), xRadius: 2, yRadius: 2).fill()
+                NSBezierPath(roundedRect: NSRect(x: 1, y: y + 0.5, width: width - 2, height: height - 1), xRadius: 2, yRadius: 2).fill()
             }
-            let color: NSColor = row.1 ? .black : (dark ? .white : .black)
-            let rowFont = row.1 ? NSFont.monospacedSystemFont(ofSize: size, weight: .bold) : font
+            let color: NSColor = row.active ? .black : (dark ? .white : .black)
+            let rowFont = row.active ? NSFont.monospacedSystemFont(ofSize: size, weight: .bold) : font
             // NSString drawing can raise an uncaught CoreText exception when adapting
             // a system monospace font and NSColor on macOS 27. Supply CoreText types directly.
             let attributes: [NSAttributedString.Key: Any] = [
                 NSAttributedString.Key(kCTFontAttributeName as String): rowFont as CTFont,
                 NSAttributedString.Key(kCTForegroundColorAttributeName as String): color.cgColor
             ]
-            let line = CTLineCreateWithAttributedString(NSAttributedString(string: row.0, attributes: attributes))
-            context.saveGState()
-            context.textMatrix = .identity
-            context.textPosition = CGPoint(x: 2, y: y - rowFont.descender)
-            CTLineDraw(line, context)
-            context.restoreGState()
+            for (text, x) in [(row.remaining, layout.percentageRight - textWidth(row.remaining, font: rowFont)),
+                              (row.plan, layout.planLeft), (row.hasError ? "!" : "", layout.errorLeft)] {
+                let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+                context.saveGState()
+                context.textMatrix = .identity
+                context.textPosition = CGPoint(x: x, y: y - rowFont.descender)
+                CTLineDraw(line, context)
+                context.restoreGState()
+            }
         }
         return true
     }
@@ -123,11 +203,9 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func render() {
         let active = current?.identity
-        let rows = accounts.map { a -> (String, Bool) in
-            let mark = errors[a.id] == nil ? "" : "!"
-            let label = usage[a.id]?.label ?? "—"
-            let padded = String(repeating: " ", count: max(0, 4 - label.count)) + label
-            return ("\(padded) \(planLabel(a.plan))\(mark)", a.identity == active)
+        let rows = accounts.map { a in
+            StatusRow(remaining: usage[a.id]?.label ?? "—", plan: planLabel(a.plan),
+                      active: a.identity == active, hasError: errors[a.id] != nil)
         }
         if rows.isEmpty {
             item.length = NSStatusItem.variableLength
@@ -142,8 +220,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let height: CGFloat = rows.count == 3 ? floor(imageHeight / 3) : rows.count == 2 ? 10 : 16
             let size: CGFloat = rows.count == 3 ? min(9, height - 0.5) : rows.count == 2 ? 9 : 11
             let font = NSFont.monospacedSystemFont(ofSize: size, weight: .medium)
-            // Measure the full percentage column, never the temporary em dash or current value.
-            let width = ceil(accounts.map { ("100% \(planLabel($0.plan)) " as NSString).size(withAttributes: [.font: font]).width }.max() ?? 50) + 4
+            let width = StatusLayout(rows: rows, size: size).width
             let dark = item.button?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let drawContent = !starting
             let image = statusImage(rows: rows, width: width, imageHeight: imageHeight,
@@ -152,15 +229,20 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.length = width + 2
         }
         item.button?.toolTip = "Codex 주간 잔여량 · 클릭하여 계정 전환"
-        item.button?.setAccessibilityLabel(rows.map { $0.0 + ($0.1 ? ", 메인 계정" : "") }.joined(separator: ", "))
+        item.button?.setAccessibilityLabel(rows.map { $0.label + ($0.active ? ", 메인 계정" : "") }.joined(separator: ", "))
         guard let menu = item.menu else { return }
         menu.removeAllItems()
         add(menu, message ?? (busy ? "처리 중…" : "주간 남은 사용량"), enabled: false)
-        for a in accounts {
-            let title = "\(usage[a.id]?.label ?? "—")  \(planLabel(a.plan))  ·  \(a.email)  ·  ↻ \(usage[a.id]?.resetCreditLabel ?? "—")"
-            let entry = add(menu, title, action: #selector(selectAccount(_:)), id: a.id, enabled: !busy)
+        let menuRows = accounts.map { a in
+            AccountMenuRow(remaining: usage[a.id]?.label ?? "—", plan: planLabel(a.plan), email: a.email,
+                           reset: usage[a.id]?.resetLabel() ?? "초기화 —", credits: usage[a.id]?.resetCreditLabel ?? "—")
+        }
+        let menuLayout = AccountMenuLayout(rows: menuRows)
+        for (a, row) in zip(accounts, menuRows) {
+            let entry = add(menu, row.title, action: #selector(selectAccount(_:)), id: a.id, enabled: !busy)
             entry.state = a.identity == active ? .on : .off
-            if a.identity == active { entry.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: NSColor.systemBlue]) }
+            entry.attributedTitle = menuLayout.title(for: row, active: a.identity == active)
+            entry.setAccessibilityLabel(row.title)
             var detail = errors[a.id] ?? ""
             if let snapshot = usage[a.id] {
                 if let reset = snapshot.reset { detail += " 초기화: " + reset.formatted(date: .abbreviated, time: .shortened) }

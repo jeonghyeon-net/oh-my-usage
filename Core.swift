@@ -84,6 +84,15 @@ struct Usage {
         resetCreditCount.map(String.init) ?? "—"
     }
 
+    func resetLabel(timeZone: TimeZone = .current) -> String {
+        guard let reset else { return "초기화 —" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "M/d (E) HH:mm"
+        return "초기화 " + formatter.string(from: reset)
+    }
+
     init(_ result: [String: Any], workspace: String) throws {
         if let id = result["accountId"] as? String, id != workspace {
             throw Failure.message("다른 계정의 사용량 응답을 받았습니다.")
@@ -99,7 +108,8 @@ struct Usage {
             remaining = min(100, max(0, 100 - used))
         } else { remaining = nil }
         reset = (week?["resetsAt"] as? NSNumber).flatMap {
-            $0.doubleValue.isFinite && $0.doubleValue > 0 ? Date(timeIntervalSince1970: $0.doubleValue) : nil
+            CFGetTypeID($0) != CFBooleanGetTypeID() && $0.doubleValue.isFinite && $0.doubleValue > 0
+                ? Date(timeIntervalSince1970: $0.doubleValue) : nil
         }
         let credits = result["rateLimitResetCredits"] as? [String: Any]
         if let number = credits?["availableCount"] as? NSNumber,
